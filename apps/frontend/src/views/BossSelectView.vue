@@ -1,14 +1,14 @@
 <template>
   <div class="app">
-    <header class="header">
-      <button class="btn-back" @click="router.push('/dashboard')">← 戻る</button>
-      <span class="title">ボスを選ぶ</span>
+    <header class="header" role="banner">
+      <button class="btn-back" @click="router.push('/dashboard')" aria-label="ダッシュボードに戻る">← 戻る</button>
+      <span class="title" role="heading" aria-level="1">ボスを選ぶ</span>
     </header>
 
-    <main class="main">
+    <main class="main" role="main">
       <div class="household-row">
-        <label>世帯人数：</label>
-        <select v-model="householdSize" class="select-household">
+        <label for="household-select">世帯人数：</label>
+        <select id="household-select" v-model="householdSize" class="select-household" aria-label="世帯人数を選択">
           <option :value="1">1人</option>
           <option :value="2">2人</option>
           <option :value="3">3人</option>
@@ -17,14 +17,18 @@
         </select>
       </div>
 
-      <div v-if="loading" class="loading">読み込み中...</div>
-      <div v-else class="bosses-list">
+      <div v-if="loading" class="loading" role="status" aria-live="polite">読み込み中...</div>
+      <div v-else class="bosses-list" role="list" aria-label="ボス一覧">
         <div
           v-for="boss in store.bosses"
           :key="boss.id"
           class="boss-card"
           :class="`difficulty-${boss.difficulty}`"
           @click="selectBoss(boss.id)"
+          role="listitem button"
+          :aria-label="`${boss.name}を選択（難易度${boss.difficulty}、報酬${boss.reward_points}ポイント）`"
+          tabindex="0"
+          @keydown.enter="selectBoss(boss.id)"
         >
           <div class="boss-top">
             <div>
@@ -45,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCoinquestStore } from '@/stores/coinquest.store'
 
@@ -55,13 +59,17 @@ const loading = ref(true)
 const householdSize = ref(store.monthStatus?.household_size ?? 1)
 
 const BOSS_EMOJI: Record<number, string> = { 1: '🟢', 2: '🔵', 3: '🟠', 4: '🔴', 5: '💀' }
-const AVG_EXPENSES: Record<number, number> = { 1: 163781, 2: 267631, 3: 312567, 4: 340234, 5: 361541 }
+
+const avgForHousehold = computed(() => {
+  const entry = store.avgExpensesData.find(e => e.household_size === householdSize.value)
+  return entry?.average_monthly_expense ?? 163781
+})
 
 const computeBudget = (ratio: number) =>
-  Math.round((AVG_EXPENSES[householdSize.value] ?? 163781) * ratio).toLocaleString()
+  Math.round(avgForHousehold.value * ratio).toLocaleString()
 
 onMounted(async () => {
-  await Promise.all([store.loadBosses(), store.loadMonthStatus()])
+  await Promise.all([store.loadBosses(), store.loadMonthStatus(), store.loadAverageExpenses()])
   // Déjà un boss ce mois-ci → retour dashboard
   if (store.monthStatus?.boss) {
     router.replace('/dashboard')

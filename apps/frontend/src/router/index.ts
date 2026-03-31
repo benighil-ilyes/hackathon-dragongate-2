@@ -5,6 +5,7 @@ const LoginView = () => import('@/views/LoginView.vue');
 const DashboardView = () => import('@/views/DashboardView.vue');
 const BossSelectView = () => import('@/views/BossSelectView.vue');
 const LeaderboardView = () => import('@/views/LeaderboardView.vue');
+const HistoryView = () => import('@/views/HistoryView.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/login' },
@@ -12,6 +13,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/dashboard', name: 'Dashboard', component: DashboardView, meta: { requiresAuth: true } },
   { path: '/boss-select', name: 'BossSelect', component: BossSelectView, meta: { requiresAuth: true } },
   { path: '/leaderboard', name: 'Leaderboard', component: LeaderboardView, meta: { requiresAuth: true } },
+  { path: '/history', name: 'History', component: HistoryView, meta: { requiresAuth: true } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ];
 

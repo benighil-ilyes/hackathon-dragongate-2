@@ -1,31 +1,31 @@
 <template>
-  <div class="login-page">
-    <div class="login-card">
-      <div class="logo">⚔️ Coin Quest</div>
+  <div class="login-page" role="main">
+    <div class="login-card" role="region" aria-label="ログイン・新規登録">
+      <div class="logo" role="img" aria-label="Coin Quest">⚔️ Coin Quest</div>
       <p class="tagline">支出を制して、伝説の冒険者になれ</p>
 
-      <div class="tabs">
-        <button :class="{ active: mode === 'login' }" @click="mode = 'login'">ログイン</button>
-        <button :class="{ active: mode === 'register' }" @click="mode = 'register'">新規登録</button>
+      <div class="tabs" role="tablist" aria-label="ログイン方法を選択">
+        <button role="tab" :aria-selected="mode === 'login'" :class="{ active: mode === 'login' }" @click="mode = 'login'">ログイン</button>
+        <button role="tab" :aria-selected="mode === 'register'" :class="{ active: mode === 'register' }" @click="mode = 'register'">新規登録</button>
       </div>
 
-      <form @submit.prevent="handleSubmit">
+      <form @submit.prevent="handleSubmit" :aria-label="mode === 'login' ? 'ログインフォーム' : '新規登録フォーム'">
         <div v-if="mode === 'register'" class="field">
-          <label>冒険者名</label>
-          <input v-model="name" type="text" placeholder="例：ShadowSaver" required minlength="2" />
+          <label for="input-name">冒険者名</label>
+          <input id="input-name" v-model="name" type="text" placeholder="例：ShadowSaver" required minlength="2" autocomplete="username" />
         </div>
         <div class="field">
-          <label>メールアドレス</label>
-          <input v-model="email" type="email" placeholder="メールアドレスを入力" required />
+          <label for="input-email">メールアドレス</label>
+          <input id="input-email" v-model="email" type="email" placeholder="メールアドレスを入力" required autocomplete="email" />
         </div>
         <div class="field">
-          <label>パスワード</label>
-          <input v-model="password" type="password" placeholder="••••••" required minlength="6" />
+          <label for="input-password">パスワード</label>
+          <input id="input-password" v-model="password" type="password" placeholder="••••••" required minlength="6" autocomplete="current-password" />
         </div>
 
-        <div v-if="error" class="error">{{ error }}</div>
+        <div v-if="error" class="error" role="alert" aria-live="assertive">{{ error }}</div>
 
-        <button type="submit" class="btn-primary" :disabled="loading">
+        <button type="submit" class="btn-primary" :disabled="loading" :aria-busy="loading">
           {{ loading ? '...' : mode === 'login' ? '冒険を始める' : 'アカウントを作成' }}
         </button>
       </form>

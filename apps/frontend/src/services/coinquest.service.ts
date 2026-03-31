@@ -126,3 +126,35 @@ export async function register(data: { name: string; email: string; password: st
   const res = await api('/users', { method: 'POST', body: data })
   return res.data
 }
+
+export interface AverageExpenseCategory {
+  name: string
+  amount: number
+}
+
+export interface AverageExpenseEntry {
+  household_size: number
+  average_monthly_expense: number
+  categories: AverageExpenseCategory[]
+}
+
+export async function getAverageExpenses(): Promise<AverageExpenseEntry[]> {
+  return apiRequest<AverageExpenseEntry[]>('/average-expenses')
+}
+
+export interface MonthHistoryItem {
+  id: number
+  year: number
+  month: number
+  boss_name: string | null
+  boss_difficulty: number | null
+  budget: number | null
+  total_expenses: number
+  result: string | null
+  score: number | null
+  household_size: number
+}
+
+export async function getMonthHistory(): Promise<MonthHistoryItem[]> {
+  return apiRequest<MonthHistoryItem[]>('/months/history')
+}

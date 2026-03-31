@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as svc from '@/services/coinquest.service'
-import type { Boss, MonthStatus, Expense, LeaderboardEntry, UserProfile } from '@/services/coinquest.service'
+import type { Boss, MonthStatus, Expense, LeaderboardEntry, UserProfile, AverageExpenseEntry, MonthHistoryItem } from '@/services/coinquest.service'
 
 export const useCoinquestStore = defineStore('coinquest', () => {
   const bosses = ref<Boss[]>([])
@@ -11,6 +11,8 @@ export const useCoinquestStore = defineStore('coinquest', () => {
   const profile = ref<UserProfile | null>(null)
   const loading = ref(false)
   const debugDate = ref<string | null>(null)
+  const avgExpensesData = ref<AverageExpenseEntry[]>([])
+  const monthHistory = ref<MonthHistoryItem[]>([])
 
   async function loadBosses() {
     bosses.value = await svc.getBosses()
@@ -79,9 +81,20 @@ export const useCoinquestStore = defineStore('coinquest', () => {
     await loadExpenses()
   }
 
+  async function loadAverageExpenses() {
+    if (avgExpensesData.value.length === 0) {
+      avgExpensesData.value = await svc.getAverageExpenses()
+    }
+  }
+
+  async function loadMonthHistory() {
+    monthHistory.value = await svc.getMonthHistory()
+  }
+
   return {
-    bosses, monthStatus, expenses, leaderboard, profile, loading, debugDate,
+    bosses, monthStatus, expenses, leaderboard, profile, loading, debugDate, avgExpensesData, monthHistory,
     loadBosses, loadMonthStatus, loadExpenses, loadLeaderboard, loadDebugDate, loadProfile,
+    loadAverageExpenses, loadMonthHistory,
     chooseBoss, addExpense, removeExpense, battle, setDebugDate, resetDebugDate,
   }
 })

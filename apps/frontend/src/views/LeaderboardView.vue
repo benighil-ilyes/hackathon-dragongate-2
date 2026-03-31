@@ -1,36 +1,38 @@
 <template>
   <div class="app">
-    <header class="header">
-      <button class="btn-back" @click="router.push('/dashboard')">← 戻る</button>
-      <span class="title">🏆 ランキング</span>
+    <header class="header" role="banner">
+      <button class="btn-back" @click="router.push('/dashboard')" aria-label="ダッシュボードに戻る">← 戻る</button>
+      <span class="title" role="heading" aria-level="1">🏆 ランキング</span>
     </header>
 
-    <main class="main">
-      <div v-if="loading" class="loading">読み込み中...</div>
-      <div v-else-if="store.leaderboard.length === 0" class="empty">
+    <main class="main" role="main">
+      <div v-if="loading" class="loading" role="status" aria-live="polite">読み込み中...</div>
+      <div v-else-if="store.leaderboard.length === 0" class="empty" aria-live="polite">
         まだランキングに冒険者がいません。
       </div>
-      <div v-else class="leaderboard">
-        <div
+      <ol v-else class="leaderboard" aria-label="冒険者ランキング">
+        <li
           v-for="entry in store.leaderboard"
           :key="entry.user_id"
           class="entry"
           :class="{ me: entry.user_id === currentUserId, podium: entry.rank <= 3 }"
+          :aria-label="`${entry.rank}位 ${entry.name} ${entry.adventurer_rank} ${entry.bosses_defeated}体撃破 ${entry.total_points}ポイント${entry.user_id === currentUserId ? '（あなた）' : ''}`"
         >
-          <div class="rank">{{ RANK_EMOJI[entry.rank] ?? entry.rank }}</div>
+          <div class="rank" aria-hidden="true">{{ RANK_EMOJI[entry.rank] ?? entry.rank }}</div>
           <div class="info">
             <div class="name">{{ entry.name }}</div>
             <div class="sub">{{ entry.adventurer_rank }} · {{ entry.bosses_defeated }}体撃破</div>
           </div>
-          <div class="points">{{ entry.total_points.toLocaleString() }}pt</div>
-        </div>
-      </div>
+          <div class="points" aria-hidden="true">{{ entry.total_points.toLocaleString() }}pt</div>
+        </li>
+      </ol>
     </main>
 
-    <nav class="bottom-nav">
-      <button @click="router.push('/dashboard')">🏠 ホーム</button>
-      <button @click="router.push('/boss-select')">👾 ボス</button>
-      <button class="active">🏆 ランキング</button>
+    <nav class="bottom-nav" role="navigation" aria-label="メインナビゲーション">
+      <button @click="router.push('/dashboard')" aria-label="ホーム">🏠 ホーム</button>
+      <button @click="router.push('/boss-select')" aria-label="ボス選択">👾 ボス</button>
+      <button class="active" aria-label="ランキング（現在のページ）" aria-current="page">🏆 ランキング</button>
+      <button @click="router.push('/history')" aria-label="冒険履歴">📜 履歴</button>
     </nav>
   </div>
 </template>
@@ -64,7 +66,7 @@ onMounted(async () => {
 .main { flex: 1; padding: 1rem; padding-bottom: 5rem; max-width: 480px; margin: 0 auto; width: 100%; }
 .loading { text-align: center; padding: 3rem; opacity: 0.5; }
 .empty { text-align: center; color: rgba(255,255,255,0.3); padding: 3rem; font-size: 0.9rem; }
-.leaderboard { display: flex; flex-direction: column; gap: 0.5rem; }
+.leaderboard { display: flex; flex-direction: column; gap: 0.5rem; list-style: none; padding: 0; margin: 0; }
 .entry { display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,0.05); border-radius: 1rem; padding: 0.9rem 1rem; border: 1px solid transparent; }
 .entry.podium { border-color: rgba(255,215,0,0.2); background: rgba(255,215,0,0.05); }
 .entry.me { border-color: rgba(255,215,0,0.5); background: rgba(255,215,0,0.08); }

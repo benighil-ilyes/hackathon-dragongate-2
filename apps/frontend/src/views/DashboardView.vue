@@ -1,49 +1,49 @@
 <template>
   <div class="app">
-    <header class="header">
-      <span class="logo">⚔️ Coin Quest</span>
+    <header class="header" role="banner">
+      <span class="logo" role="img" aria-label="Coin Quest">⚔️ Coin Quest</span>
       <div class="header-right">
-        <div class="user-info">
+        <div class="user-info" aria-label="ユーザー情報">
           <span class="username">{{ authStore.currentUser?.name }}</span>
-          <span v-if="store.profile" class="user-rank">{{ store.profile.rank }}</span>
+          <span v-if="store.profile" class="user-rank" aria-label="冒険者ランク">{{ store.profile.rank }}</span>
         </div>
-        <button class="btn-icon" @click="handleLogout">🚪</button>
+        <button class="btn-icon" @click="handleLogout" aria-label="ログアウト">🚪</button>
       </div>
     </header>
 
-    <main class="main">
-      <div v-if="loading" class="loading">読み込み中...</div>
+    <main class="main" role="main">
+      <div v-if="loading" class="loading" role="status" aria-live="polite">読み込み中...</div>
 
       <template v-else>
 
         <!-- Month header + date switcher -->
-        <div class="month-header">
+        <div class="month-header" role="region" aria-label="現在の月情報">
           <span class="month-label">{{ currentMonthLabel }}</span>
           <div class="date-switcher">
-            <span class="date-switcher-label">📅 現在日付</span>
-            <input type="date" v-model="debugDateInput" class="date-input" @change="applyDebugDate" />
-            <button v-if="store.debugDate" class="date-reset" @click="resetDate">今日に戻す</button>
+            <label for="debug-date-input" class="date-switcher-label">📅 現在日付</label>
+            <input id="debug-date-input" type="date" v-model="debugDateInput" class="date-input" @change="applyDebugDate" aria-label="デバッグ日付を設定" />
+            <button v-if="store.debugDate" class="date-reset" @click="resetDate" aria-label="今日の日付に戻す">今日に戻す</button>
           </div>
         </div>
 
         <!-- Step 1 : No boss → choose one -->
-        <div v-if="!status?.boss" class="step-card">
+        <div v-if="!status?.boss" class="step-card" role="region" aria-label="ボス選択ステップ">
           <div class="step-number">STEP 1</div>
           <div class="step-content">
-            <div class="step-icon">👾</div>
+            <div class="step-icon" aria-hidden="true">👾</div>
             <div class="step-text">
               <div class="step-title">今月のボスを選ぼう</div>
               <div class="step-desc">倒すべき敵を選んで節約クエストを開始！</div>
             </div>
           </div>
-          <button class="btn-primary" @click="router.push('/boss-select')">ボスを選ぶ →</button>
+          <button class="btn-primary" @click="router.push('/boss-select')" aria-label="ボス選択画面に移動">ボスを選ぶ →</button>
         </div>
 
         <!-- Step 2 : Boss selected → show status + expenses -->
         <template v-else>
 
           <!-- Boss status card -->
-          <div class="boss-status" :class="`d${status.boss.difficulty}`">
+          <div class="boss-status" :class="`d${status.boss.difficulty}`" role="region" :aria-label="`今月のボス：${status.boss.name}`">
             <div class="boss-status-top">
               <div class="boss-status-left">
                 <div class="boss-status-name">{{ BOSS_EMOJI[status.boss.difficulty] }} {{ status.boss.name }}</div>
@@ -55,14 +55,18 @@
             </div>
 
             <!-- Boss HP bar -->
-            <div class="hp-wrap">
+            <div class="hp-wrap" role="region" aria-label="予算残高">
               <div class="hp-header">
-                <span class="hp-label">❤️ HP</span>
-                <span class="hp-value" :class="(status.remaining ?? 0) < 0 ? 'over' : ''">
+                <span class="hp-label" aria-hidden="true">❤️ HP</span>
+                <span class="hp-value" :class="(status.remaining ?? 0) < 0 ? 'over' : ''" aria-live="polite">
                   {{ Math.max(status.remaining ?? 0, 0).toLocaleString() }} / {{ (status.budget ?? 0).toLocaleString() }}円
                 </span>
               </div>
-              <div class="hp-track">
+              <div class="hp-track" role="progressbar"
+                :aria-valuenow="hpPercent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-label="`残り予算 ${hpPercent}%`">
                 <div class="hp-fill" :style="{ width: `${hpPercent}%`, background: hpColor }"></div>
               </div>
               <div class="hp-sub">
@@ -74,18 +78,48 @@
             </div>
 
             <!-- Battle -->
-            <button v-if="!status.result" class="btn-battle" @click="handleBattle">⚔️ 月末決戦！</button>
-            <div v-if="battleMsg" class="battle-result">{{ battleMsg }}</div>
+            <button v-if="!status.result" class="btn-battle" @click="handleBattle" aria-label="月末決戦を開始する">⚔️ 月末決戦！</button>
+            <div v-if="battleMsg" class="battle-result" role="alert" aria-live="assertive">{{ battleMsg }}</div>
+          </div>
+
+          <!-- Category breakdown -->
+          <div v-if="categoryBreakdown.length > 0" class="category-card" role="region" aria-label="カテゴリ別支出内訳">
+            <div class="card-title">📊 カテゴリ別内訳</div>
+            <div class="cat-list">
+              <div v-for="cat in categoryBreakdown" :key="cat.name" class="cat-item"
+                :aria-label="`${cat.name}：${cat.spent.toLocaleString()}円（平均${cat.avg.toLocaleString()}円）`">
+                <div class="cat-item-header">
+                  <span class="cat-dot" :style="{ background: catColor(cat.name) }" aria-hidden="true"></span>
+                  <span class="cat-name">{{ cat.name }}</span>
+                  <span class="cat-amounts">
+                    <span class="cat-spent" :class="cat.spent > cat.avg ? 'over' : ''">{{ cat.spent.toLocaleString() }}円</span>
+                    <span class="cat-avg">/ {{ cat.avg.toLocaleString() }}円</span>
+                  </span>
+                </div>
+                <div class="cat-track" role="presentation">
+                  <div class="cat-avg-bar" :style="{ width: '100%' }" aria-hidden="true"></div>
+                  <div class="cat-spent-bar"
+                    :style="{
+                      width: `${Math.min(100, cat.avg > 0 ? Math.round((cat.spent / cat.avg) * 100) : 100)}%`,
+                      background: catColor(cat.name)
+                    }"
+                    aria-hidden="true"
+                  ></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Add expense -->
-          <div class="add-expense-card">
+          <div class="add-expense-card" role="region" aria-label="支出を記録">
             <div class="card-title-row">
               <span class="card-title">➕ 支出を記録する</span>
               <div class="date-row">
-                <span class="date-display" @click="showDatePicker = !showDatePicker">
+                <span class="date-display" @click="showDatePicker = !showDatePicker"
+                  role="button" tabindex="0" @keydown.enter="showDatePicker = !showDatePicker"
+                  :aria-label="`日付：${formatDateShort(newDate)}（クリックして変更）`">
                   📅 {{ formatDateShort(newDate) }}
-                  <span class="date-edit-hint">変更</span>
+                  <span class="date-edit-hint" aria-hidden="true">変更</span>
                 </span>
               </div>
             </div>
@@ -97,48 +131,51 @@
                 :max="monthMax"
                 class="inp inp-date-full"
                 @change="showDatePicker = false"
+                aria-label="支出日を選択"
               />
             </div>
-            <div v-if="addError" class="add-error">⚠️ {{ addError }}</div>
+            <div v-if="addError" class="add-error" role="alert">⚠️ {{ addError }}</div>
             <div class="add-row">
-              <input v-model.number="newAmount" type="number" placeholder="金額（円）" min="1" class="inp inp-amount" />
-              <select v-model="newCategory" class="inp inp-cat">
+              <input v-model.number="newAmount" type="number" placeholder="金額（円）" min="1" class="inp inp-amount" aria-label="金額（円）" />
+              <select v-model="newCategory" class="inp inp-cat" aria-label="カテゴリを選択">
                 <option value="">カテゴリ</option>
                 <option v-for="cat in CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
               </select>
             </div>
             <div class="add-row">
-              <input v-model="newNote" type="text" placeholder="メモ（任意）" class="inp inp-note" />
-              <button class="btn-add" :disabled="!newAmount || !newCategory || adding" @click="handleAdd">
+              <input v-model="newNote" type="text" placeholder="メモ（任意）" class="inp inp-note" aria-label="メモ（任意）" />
+              <button class="btn-add" :disabled="!newAmount || !newCategory || adding" @click="handleAdd"
+                :aria-label="adding ? '保存中' : '支出を追加'" :aria-busy="adding">
                 {{ adding ? '…' : '追加' }}
               </button>
             </div>
           </div>
 
           <!-- Expenses by date -->
-          <div class="expenses-section">
+          <div class="expenses-section" role="region" aria-label="今月の支出履歴">
             <div class="card-title">📅 支出履歴</div>
 
-            <div v-if="store.expenses.length === 0" class="empty">まだ支出が登録されていません</div>
+            <div v-if="store.expenses.length === 0" class="empty" aria-live="polite">まだ支出が登録されていません</div>
 
             <template v-else>
               <template v-for="(group, date) in groupedExpenses" :key="date">
-                <div class="date-label">{{ formatDate(date) }}</div>
-                <div class="expense-group">
-                  <div v-for="e in group" :key="e.id" class="expense-row">
-                    <div class="expense-cat-dot" :style="{ background: catColor(e.category) }"></div>
+                <div class="date-label" role="heading" aria-level="3">{{ formatDate(date) }}</div>
+                <div class="expense-group" role="list">
+                  <div v-for="e in group" :key="e.id" class="expense-row" role="listitem"
+                    :aria-label="`${e.category}：${e.amount.toLocaleString()}円${e.note ? '（' + e.note + '）' : ''}`">
+                    <div class="expense-cat-dot" :style="{ background: catColor(e.category) }" aria-hidden="true"></div>
                     <div class="expense-main">
                       <span class="expense-cat">{{ e.category }}</span>
                       <span v-if="e.note" class="expense-note">{{ e.note }}</span>
                     </div>
                     <span class="expense-amount">{{ e.amount.toLocaleString() }}円</span>
-                    <button class="btn-del" @click="store.removeExpense(e.id)">✕</button>
+                    <button class="btn-del" @click="store.removeExpense(e.id)" :aria-label="`${e.category}の支出を削除`">✕</button>
                   </div>
                 </div>
               </template>
 
               <!-- Daily total summary -->
-              <div class="daily-total">
+              <div class="daily-total" aria-live="polite">
                 合計：{{ (status.total_expenses ?? 0).toLocaleString() }}円
               </div>
             </template>
@@ -148,10 +185,11 @@
       </template>
     </main>
 
-    <nav class="bottom-nav">
-      <button class="active">🏠 ホーム</button>
-      <button @click="router.push('/boss-select')">👾 ボス</button>
-      <button @click="router.push('/leaderboard')">🏆 ランキング</button>
+    <nav class="bottom-nav" role="navigation" aria-label="メインナビゲーション">
+      <button class="active" aria-label="ホーム（現在のページ）" aria-current="page">🏠 ホーム</button>
+      <button @click="router.push('/boss-select')" aria-label="ボス選択">👾 ボス</button>
+      <button @click="router.push('/leaderboard')" aria-label="ランキング">🏆 ランキング</button>
+      <button @click="router.push('/history')" aria-label="冒険履歴">📜 履歴</button>
     </nav>
   </div>
 </template>
@@ -247,8 +285,27 @@ const formatDebugDate = (iso: string) => new Date(iso).toLocaleString('ja-JP')
 
 const catColor = (cat: string) => CAT_COLORS[cat] ?? '#b2bec3'
 
+const categoryBreakdown = computed(() => {
+  if (!status.value?.boss || !status.value?.household_size) return []
+  const avgEntry = store.avgExpensesData.find(e => e.household_size === status.value!.household_size)
+  if (!avgEntry) return []
+
+  const spentByCategory: Record<string, number> = {}
+  for (const e of store.expenses) {
+    spentByCategory[e.category] = (spentByCategory[e.category] ?? 0) + e.amount
+  }
+
+  return avgEntry.categories
+    .map(cat => ({
+      name: cat.name,
+      avg: cat.amount,
+      spent: spentByCategory[cat.name] ?? 0,
+    }))
+    .filter(cat => cat.spent > 0 || cat.avg > 0)
+})
+
 onMounted(async () => {
-  await Promise.all([store.loadMonthStatus(), store.loadExpenses(), store.loadDebugDate(), store.loadProfile()])
+  await Promise.all([store.loadMonthStatus(), store.loadExpenses(), store.loadDebugDate(), store.loadProfile(), store.loadAverageExpenses()])
   if (store.debugDate) debugDateInput.value = store.debugDate.split('T')[0]
   newDate.value = currentDay.value
   loading.value = false
@@ -368,6 +425,21 @@ const resetDate = async () => {
 
 .btn-battle { width: 100%; padding: 0.8rem; border: none; border-radius: 0.75rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #0f0c29; font-size: 0.95rem; font-weight: 800; cursor: pointer; }
 .battle-result { margin-top: 0.75rem; background: rgba(255,255,255,0.06); border-radius: 0.75rem; padding: 0.75rem; font-size: 0.85rem; text-align: center; line-height: 1.5; }
+
+/* Category breakdown */
+.category-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem; }
+.cat-list { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.75rem; }
+.cat-item { }
+.cat-item-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cat-name { font-size: 0.8rem; color: rgba(255,255,255,0.6); flex: 1; }
+.cat-amounts { display: flex; align-items: baseline; gap: 0.3rem; }
+.cat-spent { font-size: 0.82rem; font-weight: 700; color: white; }
+.cat-spent.over { color: #f44336; }
+.cat-avg { font-size: 0.72rem; color: rgba(255,255,255,0.3); }
+.cat-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; position: relative; }
+.cat-avg-bar { position: absolute; top: 0; left: 0; height: 100%; background: rgba(255,255,255,0.1); border-radius: 3px; }
+.cat-spent-bar { position: absolute; top: 0; left: 0; height: 100%; border-radius: 3px; transition: width 0.5s ease; opacity: 0.85; }
 
 /* Add expense */
 .add-expense-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem; }
