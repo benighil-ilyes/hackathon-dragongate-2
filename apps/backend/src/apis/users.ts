@@ -3,13 +3,16 @@ import { authMiddleware } from '../middleware/auth.js';
 import { UserSchema, UserParamsSchema, UserListSchema, CreateUserSchema, UpdateUserSchema } from '../schemas/users.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 import { db } from '../db/connection.js';
-import { hashPassword } from '../utils/auth.js'
+import { hashPassword, generateJWT } from '../utils/auth.js'
 
 export const storeUserApi = (app: OpenAPIHono) => {
+  // Register (POST /api/users) must be public — no auth required
+  storeCreateUserRoute(app);
+
+  // All other /api/users routes require authentication
   app.use('/api/users/*', authMiddleware);
   storeGetUserRoute(app);
   storeGetUsersRoute(app);
-  storeCreateUserRoute(app);
   storeUpdateUserRoute(app);
   storeDeleteUserRoute(app);
 };
@@ -177,12 +180,19 @@ const storeCreateUserRoute = (app: OpenAPIHono) => {
         .returning(['id', 'name', 'email', 'active', 'created_at'])
         .executeTakeFirstOrThrow();
 
+      // Generate JWT so the user is logged in immediately after registration
+      const token = await generateJWT({ userId: newUser.id, email: newUser.email });
+
       return c.json({
-        id: newUser.id.toString(),
-        name: newUser.name,
-        email: newUser.email,
-        active: newUser.active,
-        created_at: newUser.created_at.toISOString()
+        success: true,
+        data: {
+          token,
+          user: {
+            id: newUser.id,
+            name: newUser.name,
+            email: newUser.email
+          }
+        }
       }, 201);
     } catch (error) {
       console.error('Database error:', error);

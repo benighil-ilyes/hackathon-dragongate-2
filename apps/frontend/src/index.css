@@ -1,1 +1,4 @@
-/* Empty CSS file for Vite HMR */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f0c29; color: white; font-family: system-ui, -apple-system, sans-serif; }
+input, select, button { font-family: inherit; }
+input[type=number]::-webkit-inner-spin-button { opacity: 1; }

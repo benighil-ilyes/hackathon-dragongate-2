@@ -59,7 +59,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('id', 'serial', (col) => col.primaryKey())
     .addColumn('user_id', 'integer', (col) => col.notNull().references('users.id').unique())
     .addColumn('total_points', 'integer', (col) => col.defaultTo(0).notNull())
-    .addColumn('rank', 'varchar(50)', (col) => col.defaultTo('Apprenti').notNull())
+    .addColumn('rank', 'varchar(50)', (col) => col.defaultTo('見習い冒険者').notNull())
     .addColumn('bosses_defeated', 'integer', (col) => col.defaultTo(0).notNull())
     .addColumn('created_at', 'timestamp', (col) => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
     .addColumn('updated_at', 'timestamp', (col) => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
@@ -75,11 +75,11 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   // Seed bosses
   await db.insertInto('bosses').values([
-    { name: 'Slime', description: 'Un ennemi facile pour débuter.', difficulty: 1, budget_ratio: 0.95, reward_points: 100 },
-    { name: 'Gobelin', description: 'Un peu plus malin que le Slime.', difficulty: 2, budget_ratio: 0.85, reward_points: 250 },
-    { name: 'Orc', description: 'Costaud et gourmand. Difficile à vaincre.', difficulty: 3, budget_ratio: 0.75, reward_points: 500 },
-    { name: 'Dragon', description: 'Le boss légendaire. Seulement pour les vrais économes.', difficulty: 4, budget_ratio: 0.60, reward_points: 1000 },
-    { name: 'Dieu du Chaos', description: 'Impossible ? Presque.', difficulty: 5, budget_ratio: 0.45, reward_points: 2500 },
+    { name: 'スライム', description: '初心者向けの簡単な敵。まずはここから始めよう。', difficulty: 1, budget_ratio: 0.95, reward_points: 100 },
+    { name: 'ゴブリン', description: 'スライムより少し手強い。油断は禁物。', difficulty: 2, budget_ratio: 0.85, reward_points: 250 },
+    { name: 'オーク', description: 'がっしりした体格で攻撃力も高い。本格的な節約が必要。', difficulty: 3, budget_ratio: 0.75, reward_points: 500 },
+    { name: 'ドラゴン', description: '伝説の強敵。真の節約家だけが挑める。', difficulty: 4, budget_ratio: 0.60, reward_points: 1000 },
+    { name: '混沌の神', description: 'ほぼ不可能…だが倒せれば最高の栄誉。', difficulty: 5, budget_ratio: 0.45, reward_points: 2500 },
   ]).execute()
 }
 

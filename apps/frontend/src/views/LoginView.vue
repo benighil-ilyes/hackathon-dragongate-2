@@ -2,31 +2,31 @@
   <div class="login-page">
     <div class="login-card">
       <div class="logo">⚔️ Coin Quest</div>
-      <p class="tagline">Vaincs tes dépenses, deviens légende</p>
+      <p class="tagline">支出を制して、伝説の冒険者になれ</p>
 
       <div class="tabs">
-        <button :class="{ active: mode === 'login' }" @click="mode = 'login'">Connexion</button>
-        <button :class="{ active: mode === 'register' }" @click="mode = 'register'">Inscription</button>
+        <button :class="{ active: mode === 'login' }" @click="mode = 'login'">ログイン</button>
+        <button :class="{ active: mode === 'register' }" @click="mode = 'register'">新規登録</button>
       </div>
 
       <form @submit.prevent="handleSubmit">
         <div v-if="mode === 'register'" class="field">
-          <label>Pseudo d'aventurier</label>
-          <input v-model="name" type="text" placeholder="Ex: ShadowSaver" required minlength="2" />
+          <label>冒険者名</label>
+          <input v-model="name" type="text" placeholder="例：ShadowSaver" required minlength="2" />
         </div>
         <div class="field">
-          <label>Email</label>
-          <input v-model="email" type="email" placeholder="ton@email.com" required />
+          <label>メールアドレス</label>
+          <input v-model="email" type="email" placeholder="メールアドレスを入力" required />
         </div>
         <div class="field">
-          <label>Mot de passe</label>
+          <label>パスワード</label>
           <input v-model="password" type="password" placeholder="••••••" required minlength="6" />
         </div>
 
         <div v-if="error" class="error">{{ error }}</div>
 
         <button type="submit" class="btn-primary" :disabled="loading">
-          {{ loading ? '...' : mode === 'login' ? "Partir à l'aventure" : 'Créer mon compte' }}
+          {{ loading ? '...' : mode === 'login' ? '冒険を始める' : 'アカウントを作成' }}
         </button>
       </form>
     </div>
@@ -57,7 +57,7 @@ const handleSubmit = async () => {
     if (mode.value === 'login') {
       const ok = await authStore.login({ email: email.value, password: password.value })
       if (ok) router.push('/dashboard')
-      else error.value = authStore.error || 'Email ou mot de passe incorrect'
+      else error.value = authStore.error || 'メールアドレスまたはパスワードが正しくありません'
     } else {
       const res = await svc.register({ name: name.value, email: email.value, password: password.value })
       setStoredToken(res.token)
@@ -67,7 +67,7 @@ const handleSubmit = async () => {
       router.push('/dashboard')
     }
   } catch (e: any) {
-    error.value = e.message || 'Une erreur est survenue'
+    error.value = e.message || 'エラーが発生しました'
   } finally {
     loading.value = false
   }

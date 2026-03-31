@@ -1,0 +1,82 @@
+[
+  {
+    "household_size": 1,
+    "average_monthly_expense": 163781,
+    "categories": [
+      { "name": "食費", "amount": 43276 },
+      { "name": "住居費", "amount": 23322 },
+      { "name": "光熱・水道費", "amount": 13098 },
+      { "name": "家具・家事用品費", "amount": 5487 },
+      { "name": "被服費", "amount": 5047 },
+      { "name": "保健医療費", "amount": 7384 },
+      { "name": "交通・通信費", "amount": 21654 },
+      { "name": "教育費", "amount": 0 },
+      { "name": "教養娯楽費", "amount": 18794 },
+      { "name": "その他", "amount": 25719 }
+    ]
+  },
+  {
+    "household_size": 2,
+    "average_monthly_expense": 267631,
+    "categories": [
+      { "name": "食費", "amount": 72249 },
+      { "name": "住居費", "amount": 19294 },
+      { "name": "光熱・水道費", "amount": 22037 },
+      { "name": "家具・家事用品費", "amount": 11048 },
+      { "name": "被服費", "amount": 6820 },
+      { "name": "保健医療費", "amount": 15663 },
+      { "name": "交通・通信費", "amount": 30891 },
+      { "name": "教育費", "amount": 702 },
+      { "name": "教養娯楽費", "amount": 25435 },
+      { "name": "その他", "amount": 63492 }
+    ]
+  },
+  {
+    "household_size": 3,
+    "average_monthly_expense": 312567,
+    "categories": [
+      { "name": "食費", "amount": 84932 },
+      { "name": "住居費", "amount": 20541 },
+      { "name": "光熱・水道費", "amount": 25657 },
+      { "name": "家具・家事用品費", "amount": 12836 },
+      { "name": "被服費", "amount": 10452 },
+      { "name": "保健医療費", "amount": 14063 },
+      { "name": "交通・通信費", "amount": 38724 },
+      { "name": "教育費", "amount": 17218 },
+      { "name": "教養娯楽費", "amount": 27891 },
+      { "name": "その他", "amount": 60253 }
+    ]
+  },
+  {
+    "household_size": 4,
+    "average_monthly_expense": 340234,
+    "categories": [
+      { "name": "食費", "amount": 92112 },
+      { "name": "住居費", "amount": 16498 },
+      { "name": "光熱・水道費", "amount": 26947 },
+      { "name": "家具・家事用品費", "amount": 13254 },
+      { "name": "被服費", "amount": 13187 },
+      { "name": "保健医療費", "amount": 12748 },
+      { "name": "交通・通信費", "amount": 42358 },
+      { "name": "教育費", "amount": 29841 },
+      { "name": "教養娯楽費", "amount": 29673 },
+      { "name": "その他", "amount": 63616 }
+    ]
+  },
+  {
+    "household_size": 5,
+    "average_monthly_expense": 361541,
+    "categories": [
+      { "name": "食費", "amount": 100438 },
+      { "name": "住居費", "amount": 15287 },
+      { "name": "光熱・水道費", "amount": 29156 },
+      { "name": "家具・家事用品費", "amount": 12193 },
+      { "name": "被服費", "amount": 14052 },
+      { "name": "保健医療費", "amount": 12364 },
+      { "name": "交通・通信費", "amount": 44287 },
+      { "name": "教育費", "amount": 38946 },
+      { "name": "教養娯楽費", "amount": 28741 },
+      { "name": "その他", "amount": 66077 }
+    ]
+  }
+]

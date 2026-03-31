@@ -1,13 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as svc from '@/services/coinquest.service'
-import type { Boss, MonthStatus, Expense, LeaderboardEntry } from '@/services/coinquest.service'
+import type { Boss, MonthStatus, Expense, LeaderboardEntry, UserProfile } from '@/services/coinquest.service'
 
 export const useCoinquestStore = defineStore('coinquest', () => {
   const bosses = ref<Boss[]>([])
   const monthStatus = ref<MonthStatus | null>(null)
   const expenses = ref<Expense[]>([])
   const leaderboard = ref<LeaderboardEntry[]>([])
+  const profile = ref<UserProfile | null>(null)
   const loading = ref(false)
   const debugDate = ref<string | null>(null)
 
@@ -27,6 +28,10 @@ export const useCoinquestStore = defineStore('coinquest', () => {
     leaderboard.value = await svc.getLeaderboard()
   }
 
+  async function loadProfile() {
+    profile.value = await svc.getProfile()
+  }
+
   async function loadDebugDate() {
     try {
       debugDate.value = await svc.getDebugDate()
@@ -44,11 +49,9 @@ export const useCoinquestStore = defineStore('coinquest', () => {
     }
   }
 
-  async function addExpense(data: { amount: number; category: string; note?: string }) {
-    const expense = await svc.createExpense(data)
-    expenses.value.unshift(expense)
-    await loadMonthStatus()
-    return expense
+  async function addExpense(data: { amount: number; category: string; note?: string; spent_at?: string }) {
+    await svc.createExpense(data)
+    await Promise.all([loadExpenses(), loadMonthStatus()])
   }
 
   async function removeExpense(id: number) {
@@ -77,8 +80,8 @@ export const useCoinquestStore = defineStore('coinquest', () => {
   }
 
   return {
-    bosses, monthStatus, expenses, leaderboard, loading, debugDate,
-    loadBosses, loadMonthStatus, loadExpenses, loadLeaderboard, loadDebugDate,
+    bosses, monthStatus, expenses, leaderboard, profile, loading, debugDate,
+    loadBosses, loadMonthStatus, loadExpenses, loadLeaderboard, loadDebugDate, loadProfile,
     chooseBoss, addExpense, removeExpense, battle, setDebugDate, resetDebugDate,
   }
 })

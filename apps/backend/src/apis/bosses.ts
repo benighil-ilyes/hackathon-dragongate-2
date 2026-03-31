@@ -2,6 +2,31 @@ import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { authMiddleware } from '../middleware/auth.js'
 import { db } from '../db/connection.js'
 import { getCurrentDate } from '../utils/current-date.js'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const avgExpensesData: Array<{ household_size: number; average_monthly_expense: number; categories: Array<{ name: string; amount: number }> }> =
+  JSON.parse(readFileSync(join(__dirname, '../data/average_expenses.json'), 'utf-8'))
+const avgExpenses: Record<number, number> = Object.fromEntries(avgExpensesData.map(h => [h.household_size, h.average_monthly_expense]))
+
+const RANKS = [
+  { name: '見習い冒険者', minPoints: 0,    minBosses: 0 },
+  { name: '銅の剣士',     minPoints: 100,  minBosses: 1 },
+  { name: '銀の戦士',     minPoints: 500,  minBosses: 3 },
+  { name: '金の騎士',     minPoints: 1500, minBosses: 6 },
+  { name: '伝説の勇者',   minPoints: 4000, minBosses: 10 },
+  { name: '節約の神',     minPoints: 9000, minBosses: 15 },
+]
+
+function computeRank(points: number, defeated: number): string {
+  let rank = RANKS[0].name
+  for (const r of RANKS) {
+    if (points >= r.minPoints && defeated >= r.minBosses) rank = r.name
+  }
+  return rank
+}
 
 const BossSchema = z.object({
   id: z.number(),
@@ -128,11 +153,10 @@ export const storeBossApi = (app: OpenAPIHono) => {
     const month = now.getMonth() + 1
 
     const boss = await db.selectFrom('bosses').selectAll().where('id', '=', boss_id).executeTakeFirst()
-    if (!boss) return c.json({ success: false, message: 'Boss not found' }, 404)
+    if (!boss) return c.json({ success: false, message: 'ボスが見つかりません' }, 404)
 
     // Get average expense for household size
-    const avgExpenses: Record<number, number> = { 1: 163781, 2: 287315, 3: 339873, 4: 371381, 5: 389855 }
-    const avg = avgExpenses[household_size] ?? 163781
+    const avg = avgExpenses[household_size] ?? avgExpenses[1]
     const budget = Math.round(avg * Number(boss.budget_ratio))
 
     const existing = await db
@@ -194,7 +218,7 @@ export const storeBossApi = (app: OpenAPIHono) => {
       .executeTakeFirst()
 
     if (!userMonth || !userMonth.boss_id || !userMonth.budget) {
-      return c.json({ success: false, message: 'No boss selected for this month' }, 400)
+      return c.json({ success: false, message: '今月のボスが選択されていません' }, 400)
     }
 
     const start = new Date(year, month - 1, 1)
@@ -217,12 +241,12 @@ export const storeBossApi = (app: OpenAPIHono) => {
     if (total > budget) {
       result = 'lose'
       score = 0
-      message = `Défaite ! Vous avez dépensé ${total}¥ pour un budget de ${budget}¥. ${boss.name} vous a vaincu !`
+      message = `敗北！予算${budget}円に対して${total}円使いすぎました。${boss.name}に負けてしまった！`
     } else {
-      const ratio = 1 - (total / budget) // 0 = exact, 1 = nothing spent
+      const ratio = 1 - (total / budget)
       score = Math.round(Number(boss.reward_points) * (1 + ratio))
       result = 'win'
-      message = `Victoire ! Vous avez vaincu ${boss.name} avec ${total}¥ dépensés sur ${budget}¥ ! Score : ${score}`
+      message = `勝利！${boss.name}を倒した！支出${total}円 / 予算${budget}円。スコア：${score}pt`
     }
 
     await db.updateTable('user_months')
@@ -231,15 +255,33 @@ export const storeBossApi = (app: OpenAPIHono) => {
       .execute()
 
     if (result === 'win') {
+      const profile = await db.selectFrom('user_profiles').select(['total_points', 'bosses_defeated']).where('user_id', '=', user.id).executeTakeFirst()
+      const newPoints = (Number(profile?.total_points ?? 0)) + score
+      const newDefeated = (Number(profile?.bosses_defeated ?? 0)) + 1
+      const rank = computeRank(newPoints, newDefeated)
       await db.updateTable('user_profiles')
-        .set((eb) => ({
-          total_points: eb('total_points', '+', score),
-          bosses_defeated: eb('bosses_defeated', '+', 1),
-        }))
+        .set({ total_points: newPoints, bosses_defeated: newDefeated, rank, updated_at: new Date() })
         .where('user_id', '=', user.id)
         .execute()
     }
 
     return c.json({ success: true, data: { result, score, message } })
+  })
+
+  // GET /api/average-expenses
+  const avgExpensesRoute = createRoute({
+    method: 'get',
+    path: '/api/average-expenses',
+    responses: {
+      200: {
+        content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.array(z.any()) }) } },
+        description: '平均支出データ'
+      },
+    },
+  })
+
+  app.use('/api/average-expenses', authMiddleware)
+  app.openapi(avgExpensesRoute, (c) => {
+    return c.json({ success: true, data: avgExpensesData })
   })
 }

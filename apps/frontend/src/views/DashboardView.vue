@@ -3,138 +3,259 @@
     <header class="header">
       <span class="logo">⚔️ Coin Quest</span>
       <div class="header-right">
-        <span class="username">{{ authStore.currentUser?.name }}</span>
-        <button class="btn-icon" @click="router.push('/leaderboard')">🏆</button>
-        <button class="btn-icon" @click="showDebug = !showDebug">🐛</button>
+        <div class="user-info">
+          <span class="username">{{ authStore.currentUser?.name }}</span>
+          <span v-if="store.profile" class="user-rank">{{ store.profile.rank }}</span>
+        </div>
         <button class="btn-icon" @click="handleLogout">🚪</button>
       </div>
     </header>
 
-    <div v-if="showDebug" class="debug-panel">
-      <span>🐛 Date :</span>
-      <input type="datetime-local" v-model="debugInput" />
-      <button @click="applyDebugDate">Appliquer</button>
-      <button @click="store.resetDebugDate()">Reset</button>
-      <span v-if="store.debugDate" class="debug-active">{{ store.debugDate }}</span>
-    </div>
-
     <main class="main">
-      <div v-if="loading" class="loading">Chargement...</div>
-
-      <template v-else-if="!status?.boss">
-        <div class="no-boss-card">
-          <div class="boss-emoji">👾</div>
-          <h2>Aucun boss ce mois-ci</h2>
-          <p>Choisissez un ennemi à vaincre pour commencer votre quête d'économies !</p>
-          <button class="btn-primary" @click="router.push('/boss-select')">Choisir un boss</button>
-        </div>
-      </template>
+      <div v-if="loading" class="loading">読み込み中...</div>
 
       <template v-else>
-        <div class="boss-card" :class="`difficulty-${status.boss.difficulty}`">
-          <div class="boss-header">
-            <div>
-              <div class="boss-name">{{ BOSS_EMOJI[status.boss.difficulty] }} {{ status.boss.name }}</div>
-              <div class="boss-diff">{{ '⭐'.repeat(status.boss.difficulty) }} · {{ status.boss.reward_points }} pts</div>
-            </div>
-            <div v-if="status.result" class="result-badge" :class="status.result">
-              {{ status.result === 'win' ? '🏆 Victoire !' : '💀 Défaite' }}
-            </div>
-            <button v-else class="btn-sm" @click="router.push('/boss-select')">Changer</button>
-          </div>
 
-          <div class="budget-section">
-            <div class="budget-row">
-              <span>Budget : {{ fmt(status.budget) }}¥</span>
-              <span :class="(status.remaining ?? 0) < 0 ? 'danger' : 'safe'">
-                Reste : {{ fmt(status.remaining) }}¥
-              </span>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: `${Math.min(status.progress_pct ?? 0, 100)}%`, background: progressColor }"></div>
-            </div>
-            <div class="progress-label">{{ status.total_expenses }}¥ / {{ status.budget }}¥ · {{ status.progress_pct ?? 0 }}%</div>
-          </div>
-
-          <button v-if="!status.result" class="btn-battle" @click="handleBattle">⚔️ Lancer le combat !</button>
-          <div v-if="battleMsg" class="battle-msg">{{ battleMsg }}</div>
-        </div>
-
-        <div class="section-title">➕ Ajouter une dépense</div>
-        <div class="expense-form">
-          <div class="form-row">
-            <input v-model.number="newAmount" type="number" placeholder="Montant (¥)" min="1" class="input-amount" />
-            <select v-model="newCategory" class="input-cat">
-              <option value="">Catégorie</option>
-              <option v-for="cat in CATEGORIES" :key="cat" :value="cat">{{ CATEGORY_LABELS[cat] }}</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <input v-model="newNote" type="text" placeholder="Note (optionnel)" class="input-note" />
-            <button class="btn-add" :disabled="!newAmount || !newCategory || addingExpense" @click="handleAddExpense">
-              {{ addingExpense ? '...' : 'OK' }}
-            </button>
+        <!-- Month header + date switcher -->
+        <div class="month-header">
+          <span class="month-label">{{ currentMonthLabel }}</span>
+          <div class="date-switcher">
+            <span class="date-switcher-label">📅 現在日付</span>
+            <input type="date" v-model="debugDateInput" class="date-input" @change="applyDebugDate" />
+            <button v-if="store.debugDate" class="date-reset" @click="resetDate">今日に戻す</button>
           </div>
         </div>
 
-        <div class="section-title">📋 Dépenses du mois</div>
-        <div v-if="store.expenses.length === 0" class="empty">Aucune dépense enregistrée</div>
-        <div v-else class="expenses-list">
-          <div v-for="e in store.expenses" :key="e.id" class="expense-item">
-            <div class="expense-info">
-              <span class="expense-cat">{{ CATEGORY_LABELS[e.category] ?? e.category }}</span>
-              <span class="expense-note">{{ e.note }}</span>
-            </div>
-            <div class="expense-right">
-              <span class="expense-amount">{{ fmt(e.amount) }}¥</span>
-              <button class="btn-del" @click="store.removeExpense(e.id)">✕</button>
+        <!-- Step 1 : No boss → choose one -->
+        <div v-if="!status?.boss" class="step-card">
+          <div class="step-number">STEP 1</div>
+          <div class="step-content">
+            <div class="step-icon">👾</div>
+            <div class="step-text">
+              <div class="step-title">今月のボスを選ぼう</div>
+              <div class="step-desc">倒すべき敵を選んで節約クエストを開始！</div>
             </div>
           </div>
+          <button class="btn-primary" @click="router.push('/boss-select')">ボスを選ぶ →</button>
         </div>
+
+        <!-- Step 2 : Boss selected → show status + expenses -->
+        <template v-else>
+
+          <!-- Boss status card -->
+          <div class="boss-status" :class="`d${status.boss.difficulty}`">
+            <div class="boss-status-top">
+              <div class="boss-status-left">
+                <div class="boss-status-name">{{ BOSS_EMOJI[status.boss.difficulty] }} {{ status.boss.name }}</div>
+                <div class="boss-status-stars">{{ '⭐'.repeat(status.boss.difficulty) }} · {{ status.boss.reward_points }}pt</div>
+              </div>
+              <div v-if="status.result" class="result-pill" :class="status.result">
+                {{ status.result === 'win' ? '🏆 勝利' : '💀 敗北' }}
+              </div>
+            </div>
+
+            <!-- Boss HP bar -->
+            <div class="hp-wrap">
+              <div class="hp-header">
+                <span class="hp-label">❤️ HP</span>
+                <span class="hp-value" :class="(status.remaining ?? 0) < 0 ? 'over' : ''">
+                  {{ Math.max(status.remaining ?? 0, 0).toLocaleString() }} / {{ (status.budget ?? 0).toLocaleString() }}円
+                </span>
+              </div>
+              <div class="hp-track">
+                <div class="hp-fill" :style="{ width: `${hpPercent}%`, background: hpColor }"></div>
+              </div>
+              <div class="hp-sub">
+                <span>{{ (status.total_expenses ?? 0).toLocaleString() }}円 消費</span>
+                <span :class="(status.remaining ?? 0) < 0 ? 'over' : 'safe'">
+                  {{ (status.remaining ?? 0) < 0 ? '⚠️ 予算オーバー！' : `残り ${(status.remaining ?? 0).toLocaleString()}円` }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Battle -->
+            <button v-if="!status.result" class="btn-battle" @click="handleBattle">⚔️ 月末決戦！</button>
+            <div v-if="battleMsg" class="battle-result">{{ battleMsg }}</div>
+          </div>
+
+          <!-- Add expense -->
+          <div class="add-expense-card">
+            <div class="card-title-row">
+              <span class="card-title">➕ 支出を記録する</span>
+              <div class="date-row">
+                <span class="date-display" @click="showDatePicker = !showDatePicker">
+                  📅 {{ formatDateShort(newDate) }}
+                  <span class="date-edit-hint">変更</span>
+                </span>
+              </div>
+            </div>
+            <div v-if="showDatePicker" class="date-picker-wrap">
+              <input
+                type="date"
+                v-model="newDate"
+                :min="monthMin"
+                :max="monthMax"
+                class="inp inp-date-full"
+                @change="showDatePicker = false"
+              />
+            </div>
+            <div v-if="addError" class="add-error">⚠️ {{ addError }}</div>
+            <div class="add-row">
+              <input v-model.number="newAmount" type="number" placeholder="金額（円）" min="1" class="inp inp-amount" />
+              <select v-model="newCategory" class="inp inp-cat">
+                <option value="">カテゴリ</option>
+                <option v-for="cat in CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
+              </select>
+            </div>
+            <div class="add-row">
+              <input v-model="newNote" type="text" placeholder="メモ（任意）" class="inp inp-note" />
+              <button class="btn-add" :disabled="!newAmount || !newCategory || adding" @click="handleAdd">
+                {{ adding ? '…' : '追加' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Expenses by date -->
+          <div class="expenses-section">
+            <div class="card-title">📅 支出履歴</div>
+
+            <div v-if="store.expenses.length === 0" class="empty">まだ支出が登録されていません</div>
+
+            <template v-else>
+              <template v-for="(group, date) in groupedExpenses" :key="date">
+                <div class="date-label">{{ formatDate(date) }}</div>
+                <div class="expense-group">
+                  <div v-for="e in group" :key="e.id" class="expense-row">
+                    <div class="expense-cat-dot" :style="{ background: catColor(e.category) }"></div>
+                    <div class="expense-main">
+                      <span class="expense-cat">{{ e.category }}</span>
+                      <span v-if="e.note" class="expense-note">{{ e.note }}</span>
+                    </div>
+                    <span class="expense-amount">{{ e.amount.toLocaleString() }}円</span>
+                    <button class="btn-del" @click="store.removeExpense(e.id)">✕</button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Daily total summary -->
+              <div class="daily-total">
+                合計：{{ (status.total_expenses ?? 0).toLocaleString() }}円
+              </div>
+            </template>
+          </div>
+
+        </template>
       </template>
     </main>
 
     <nav class="bottom-nav">
-      <button class="active">🏠 Accueil</button>
-      <button @click="router.push('/boss-select')">👾 Boss</button>
-      <button @click="router.push('/leaderboard')">🏆 Classement</button>
+      <button class="active">🏠 ホーム</button>
+      <button @click="router.push('/boss-select')">👾 ボス</button>
+      <button @click="router.push('/leaderboard')">🏆 ランキング</button>
     </nav>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores'
 import { useCoinquestStore } from '@/stores/coinquest.store'
-import { CATEGORIES, CATEGORY_LABELS } from '@/services/coinquest.service'
+import { CATEGORIES } from '@/services/coinquest.service'
+import type { Expense } from '@/services/coinquest.service'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const store = useCoinquestStore()
 
 const loading = ref(true)
-const showDebug = ref(false)
-const debugInput = ref('')
+const debugDateInput = ref(new Date().toISOString().split('T')[0])
 const newAmount = ref<number | null>(null)
 const newCategory = ref('')
 const newNote = ref('')
-const addingExpense = ref(false)
+const currentDay = computed(() => {
+  const d = store.debugDate ? new Date(store.debugDate) : new Date()
+  return d.toISOString().split('T')[0]
+})
+const newDate = ref(new Date().toISOString().split('T')[0])
+const adding = ref(false)
+const addError = ref('')
 const battleMsg = ref('')
+const showDatePicker = ref(false)
 
 const BOSS_EMOJI: Record<number, string> = { 1: '🟢', 2: '🔵', 3: '🟠', 4: '🔴', 5: '💀' }
+
+const CAT_COLORS: Record<string, string> = {
+  '食費': '#ff6b6b', '住居費': '#4ecdc4', '光熱・水道費': '#45b7d1',
+  '家具・家事用品費': '#96ceb4', '被服費': '#ffeaa7', '保健医療費': '#fd79a8',
+  '交通・通信費': '#6c5ce7', '教育費': '#00b894', '教養娯楽費': '#fdcb6e', 'その他': '#b2bec3'
+}
+
 const status = computed(() => store.monthStatus)
-const progressColor = computed(() => {
-  const pct = status.value?.progress_pct ?? 0
-  if (pct < 60) return '#4caf50'
-  if (pct < 85) return '#ff9800'
-  return '#f44336'
+
+const currentMonthLabel = computed(() => {
+  const d = store.debugDate ? new Date(store.debugDate) : new Date()
+  return `${d.getFullYear()}年${d.getMonth() + 1}月`
 })
-const fmt = (n: number | null | undefined) => n !== null && n !== undefined ? n.toLocaleString() : '—'
+
+const hpPercent = computed(() => {
+  const budget = status.value?.budget ?? 0
+  const remaining = status.value?.remaining ?? 0
+  if (!budget) return 100
+  return Math.max(0, Math.round((remaining / budget) * 100))
+})
+
+const hpColor = computed(() => {
+  const pct = hpPercent.value
+  if (pct > 50) return 'linear-gradient(90deg, #4caf50, #8bc34a)'
+  if (pct > 25) return 'linear-gradient(90deg, #ff9800, #ffc107)'
+  return 'linear-gradient(90deg, #f44336, #ff5722)'
+})
+
+const groupedExpenses = computed(() => {
+  const groups: Record<string, Expense[]> = {}
+  const sorted = [...store.expenses].sort((a, b) => new Date(b.spent_at).getTime() - new Date(a.spent_at).getTime())
+  for (const e of sorted) {
+    const date = e.spent_at.split('T')[0]
+    if (!groups[date]) groups[date] = []
+    groups[date].push(e)
+  }
+  return groups
+})
+
+const formatDate = (dateStr: string) => {
+  const d = new Date(dateStr + 'T12:00:00')
+  return `${d.getMonth() + 1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`
+}
+
+const formatDateShort = (dateStr: string) => {
+  const d = new Date(dateStr + 'T12:00:00')
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+const monthMin = computed(() => {
+  const d = store.debugDate ? new Date(store.debugDate) : new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+})
+
+const monthMax = computed(() => {
+  const d = store.debugDate ? new Date(store.debugDate) : new Date()
+  return d.toISOString().split('T')[0]
+})
+
+const formatDebugDate = (iso: string) => new Date(iso).toLocaleString('ja-JP')
+
+const catColor = (cat: string) => CAT_COLORS[cat] ?? '#b2bec3'
 
 onMounted(async () => {
-  await Promise.all([store.loadMonthStatus(), store.loadExpenses(), store.loadDebugDate()])
+  await Promise.all([store.loadMonthStatus(), store.loadExpenses(), store.loadDebugDate(), store.loadProfile()])
+  if (store.debugDate) debugDateInput.value = store.debugDate.split('T')[0]
+  newDate.value = currentDay.value
   loading.value = false
+})
+
+watch(currentDay, (val) => {
+  newDate.value = val
 })
 
 const handleLogout = async () => {
@@ -142,90 +263,149 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-const handleAddExpense = async () => {
+const handleAdd = async () => {
   if (!newAmount.value || !newCategory.value) return
-  addingExpense.value = true
+  adding.value = true
+  addError.value = ''
   try {
-    await store.addExpense({ amount: newAmount.value, category: newCategory.value, note: newNote.value || undefined })
+    await store.addExpense({
+      amount: newAmount.value,
+      category: newCategory.value,
+      note: newNote.value || undefined,
+      spent_at: newDate.value ? new Date(newDate.value + 'T12:00:00').toISOString() : undefined,
+    })
     newAmount.value = null
     newCategory.value = ''
     newNote.value = ''
+    newDate.value = currentDay.value
+  } catch (e: any) {
+    addError.value = e.message || '保存に失敗しました'
   } finally {
-    addingExpense.value = false
+    adding.value = false
   }
 }
 
 const handleBattle = async () => {
   const result = await store.battle()
   battleMsg.value = result.message
+  await store.loadProfile()
 }
 
 const applyDebugDate = async () => {
-  if (!debugInput.value) return
-  await store.setDebugDate(new Date(debugInput.value).toISOString())
+  if (!debugDateInput.value) return
+  await store.setDebugDate(new Date(debugDateInput.value).toISOString())
+}
+
+const resetDate = async () => {
+  await store.resetDebugDate()
+  debugDateInput.value = new Date().toISOString().split('T')[0]
 }
 </script>
 
 <style scoped>
 * { box-sizing: border-box; }
 .app { min-height: 100vh; background: #0f0c29; color: white; font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
-.header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(0,0,0,0.4); position: sticky; top: 0; z-index: 10; }
+
+.header { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1rem; background: rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .logo { font-weight: 800; color: #ffd700; font-size: 1.1rem; }
 .header-right { display: flex; align-items: center; gap: 0.5rem; }
-.username { color: rgba(255,255,255,0.6); font-size: 0.85rem; }
-.btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0.25rem; }
-.debug-panel { background: rgba(255,200,0,0.1); border-bottom: 1px solid rgba(255,200,0,0.3); padding: 0.75rem 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
-.debug-panel input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; color: white; padding: 0.3rem 0.5rem; font-size: 0.8rem; }
-.debug-panel button { background: rgba(255,200,0,0.2); border: 1px solid rgba(255,200,0,0.4); border-radius: 0.5rem; color: #ffd700; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.8rem; }
-.debug-active { color: #ffd700; font-size: 0.8rem; }
+.user-info { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+.username { color: rgba(255,255,255,0.6); font-size: 0.8rem; }
+.user-rank { color: #ffd700; font-size: 0.7rem; font-weight: 700; }
+.btn-icon { background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0.25rem; }
+
+.debug-panel { background: rgba(255,200,0,0.08); border-bottom: 1px solid rgba(255,200,0,0.2); padding: 0.6rem 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-size: 0.8rem; color: rgba(255,255,255,0.6); }
+.debug-panel input { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.4rem; color: white; padding: 0.25rem 0.4rem; font-size: 0.75rem; }
+.debug-panel button { background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.3); border-radius: 0.4rem; color: #ffd700; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.75rem; }
+.debug-active { color: #ffd700; }
+
 .main { flex: 1; padding: 1rem; padding-bottom: 5rem; max-width: 480px; margin: 0 auto; width: 100%; }
-.loading { text-align: center; padding: 3rem; opacity: 0.5; }
-.no-boss-card { text-align: center; background: rgba(255,255,255,0.05); border-radius: 1.5rem; padding: 2rem; margin-top: 2rem; }
-.boss-emoji { font-size: 4rem; margin-bottom: 1rem; }
-.no-boss-card h2 { margin: 0 0 0.5rem; }
-.no-boss-card p { color: rgba(255,255,255,0.5); margin-bottom: 1.5rem; font-size: 0.9rem; }
-.boss-card { border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 1.25rem; }
-.difficulty-1 { background: linear-gradient(135deg, #1a3a1a, #2d5a2d); border: 1px solid #4caf50; }
-.difficulty-2 { background: linear-gradient(135deg, #1a2a4a, #2d4a7a); border: 1px solid #2196f3; }
-.difficulty-3 { background: linear-gradient(135deg, #3a2a1a, #7a4a1a); border: 1px solid #ff9800; }
-.difficulty-4 { background: linear-gradient(135deg, #3a1a1a, #7a2a2a); border: 1px solid #f44336; }
-.difficulty-5 { background: linear-gradient(135deg, #2a1a3a, #4a1a6a); border: 1px solid #9c27b0; }
-.boss-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-.boss-name { font-size: 1.25rem; font-weight: 800; }
-.boss-diff { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 0.25rem; }
-.result-badge { padding: 0.4rem 0.75rem; border-radius: 2rem; font-weight: 700; font-size: 0.9rem; }
-.result-badge.win { background: rgba(76,175,80,0.3); color: #4caf50; }
-.result-badge.lose { background: rgba(244,67,54,0.3); color: #f44336; }
-.btn-sm { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; color: white; padding: 0.4rem 0.75rem; cursor: pointer; font-size: 0.85rem; }
-.budget-section { margin-bottom: 1rem; }
-.budget-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem; }
+.loading { text-align: center; padding: 3rem; opacity: 0.4; }
+
+.month-header { margin-bottom: 1.25rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 1rem; padding: 0.9rem 1rem; }
+.month-label { font-size: 1.15rem; font-weight: 800; color: white; display: block; margin-bottom: 0.6rem; }
+.date-switcher { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.date-switcher-label { font-size: 0.78rem; color: rgba(255,255,255,0.4); white-space: nowrap; }
+.date-input { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,215,0,0.3); border-radius: 0.6rem; color: white; padding: 0.35rem 0.6rem; font-size: 0.82rem; flex: 1; min-width: 130px; }
+.date-input:focus { outline: none; border-color: #ffd700; }
+.date-reset { background: rgba(244,67,54,0.15); border: 1px solid rgba(244,67,54,0.3); border-radius: 0.6rem; color: #ff6b6b; padding: 0.35rem 0.65rem; cursor: pointer; font-size: 0.78rem; white-space: nowrap; }
+
+/* Step card (no boss) */
+.step-card { background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); border-radius: 1.25rem; padding: 1.5rem; margin-bottom: 1.25rem; }
+.step-number { font-size: 0.7rem; font-weight: 800; color: #ffd700; letter-spacing: 0.1em; margin-bottom: 1rem; }
+.step-content { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+.step-icon { font-size: 2.5rem; }
+.step-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem; }
+.step-desc { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
+
+/* Boss status */
+.boss-status { border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 1.25rem; }
+.d1 { background: linear-gradient(135deg, #1a3a1a, #2d5a2d); border: 1px solid #4caf5066; }
+.d2 { background: linear-gradient(135deg, #1a2a4a, #2d4a7a); border: 1px solid #2196f366; }
+.d3 { background: linear-gradient(135deg, #3a2a1a, #7a4a1a); border: 1px solid #ff980066; }
+.d4 { background: linear-gradient(135deg, #3a1a1a, #7a2a2a); border: 1px solid #f4433666; }
+.d5 { background: linear-gradient(135deg, #2a1a3a, #4a1a6a); border: 1px solid #9c27b066; }
+
+.boss-status-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.boss-status-name { font-size: 1.15rem; font-weight: 800; }
+.boss-status-stars { font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-top: 0.2rem; }
+.result-pill { padding: 0.35rem 0.75rem; border-radius: 2rem; font-weight: 700; font-size: 0.85rem; }
+.result-pill.win { background: rgba(76,175,80,0.25); color: #4caf50; }
+.result-pill.lose { background: rgba(244,67,54,0.25); color: #f44336; }
+.btn-change { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.5rem; color: rgba(255,255,255,0.7); padding: 0.35rem 0.65rem; cursor: pointer; font-size: 0.8rem; }
+
+.hp-wrap { margin-bottom: 1rem; }
+.hp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+.hp-label { font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.5); }
+.hp-value { font-size: 0.85rem; font-weight: 700; color: white; }
+.hp-value.over { color: #f44336; }
+.hp-track { height: 18px; background: rgba(0,0,0,0.5); border-radius: 9px; overflow: hidden; margin-bottom: 0.4rem; border: 1px solid rgba(255,255,255,0.08); }
+.hp-fill { height: 100%; border-radius: 9px; transition: width 0.6s ease; position: relative; }
+.hp-fill::after { content: ''; position: absolute; top: 2px; left: 4px; right: 4px; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; }
+.hp-sub { display: flex; justify-content: space-between; font-size: 0.8rem; }
+.over { color: #f44336; font-weight: 700; }
 .safe { color: #4caf50; }
-.danger { color: #f44336; }
-.progress-bar { height: 12px; background: rgba(0,0,0,0.4); border-radius: 6px; overflow: hidden; margin-bottom: 0.35rem; }
-.progress-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; }
-.progress-label { font-size: 0.75rem; color: rgba(255,255,255,0.5); text-align: right; }
-.btn-battle { width: 100%; padding: 0.85rem; border: none; border-radius: 0.75rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #0f0c29; font-size: 1rem; font-weight: 800; cursor: pointer; margin-top: 0.5rem; }
-.battle-msg { margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.08); border-radius: 0.75rem; font-size: 0.9rem; text-align: center; }
-.section-title { font-weight: 700; margin-bottom: 0.75rem; color: rgba(255,255,255,0.7); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
-.expense-form { background: rgba(255,255,255,0.05); border-radius: 1rem; padding: 1rem; margin-bottom: 1.25rem; }
-.form-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-.form-row:last-child { margin-bottom: 0; }
-.input-amount { width: 40%; padding: 0.65rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: white; font-size: 1rem; }
-.input-cat { flex: 1; padding: 0.65rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.15); background: rgba(30,20,60,0.9); color: white; font-size: 0.9rem; }
-.input-note { flex: 1; padding: 0.65rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: white; font-size: 0.9rem; }
-.btn-add { padding: 0.65rem 1.25rem; border: none; border-radius: 0.75rem; background: #ffd700; color: #0f0c29; font-weight: 700; cursor: pointer; font-size: 1rem; }
-.btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
-.empty { text-align: center; color: rgba(255,255,255,0.3); padding: 2rem; font-size: 0.9rem; }
-.expenses-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.expense-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border-radius: 0.75rem; padding: 0.75rem 1rem; }
-.expense-info { display: flex; flex-direction: column; gap: 0.2rem; }
-.expense-cat { font-weight: 600; font-size: 0.9rem; }
-.expense-note { font-size: 0.8rem; color: rgba(255,255,255,0.4); }
-.expense-right { display: flex; align-items: center; gap: 0.75rem; }
-.expense-amount { font-weight: 700; color: #ffd700; }
-.btn-del { background: none; border: none; color: rgba(255,100,100,0.7); cursor: pointer; font-size: 0.9rem; padding: 0.25rem; }
-.btn-primary { padding: 0.9rem 2rem; border: none; border-radius: 0.75rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #0f0c29; font-size: 1rem; font-weight: 700; cursor: pointer; }
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: rgba(15,12,41,0.95); border-top: 1px solid rgba(255,255,255,0.1); }
-.bottom-nav button { flex: 1; padding: 0.85rem; border: none; background: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 0.8rem; }
+
+.btn-battle { width: 100%; padding: 0.8rem; border: none; border-radius: 0.75rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #0f0c29; font-size: 0.95rem; font-weight: 800; cursor: pointer; }
+.battle-result { margin-top: 0.75rem; background: rgba(255,255,255,0.06); border-radius: 0.75rem; padding: 0.75rem; font-size: 0.85rem; text-align: center; line-height: 1.5; }
+
+/* Add expense */
+.add-expense-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem; }
+.card-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.card-title { font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.06em; }
+.date-display { font-size: 0.82rem; color: rgba(255,255,255,0.5); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; }
+.date-edit-hint { background: rgba(255,215,0,0.12); color: #ffd700; border-radius: 0.4rem; padding: 0.15rem 0.4rem; font-size: 0.72rem; }
+.date-picker-wrap { margin-bottom: 0.6rem; }
+.inp-date-full { width: 100%; padding: 0.6rem 0.75rem; border-radius: 0.75rem; border: 1px solid rgba(255,215,0,0.4); background: rgba(255,255,255,0.06); color: white; font-size: 0.9rem; }
+.add-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.add-row:last-child { margin-bottom: 0; }
+.inp { padding: 0.65rem 0.75rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: white; font-size: 0.9rem; }
+.inp:focus { outline: none; border-color: rgba(255,215,0,0.5); }
+.inp-amount { width: 35%; }
+.inp-cat { flex: 1; background: rgba(20,15,50,0.9); }
+.inp-note { flex: 1; }
+.inp-date { width: 38%; font-size: 0.8rem; }
+.btn-add { padding: 0.65rem 1rem; border: none; border-radius: 0.75rem; background: #ffd700; color: #0f0c29; font-weight: 700; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
+.btn-add:disabled { opacity: 0.45; cursor: not-allowed; }
+.add-error { color: #ff6b6b; font-size: 0.8rem; margin-bottom: 0.5rem; }
+
+/* Expenses */
+.expenses-section { }
+.empty { text-align: center; color: rgba(255,255,255,0.25); padding: 2rem; font-size: 0.85rem; }
+.date-label { font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.4); margin: 1rem 0 0.4rem; padding-left: 0.25rem; }
+.expense-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.expense-row { display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.04); border-radius: 0.75rem; padding: 0.7rem 0.85rem; }
+.expense-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.expense-main { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
+.expense-cat { font-size: 0.9rem; font-weight: 600; }
+.expense-note { font-size: 0.75rem; color: rgba(255,255,255,0.35); }
+.expense-amount { font-weight: 700; color: #ffd700; font-size: 0.9rem; white-space: nowrap; }
+.btn-del { background: none; border: none; color: rgba(255,100,100,0.5); cursor: pointer; font-size: 0.8rem; padding: 0.15rem; }
+.daily-total { text-align: right; margin-top: 1rem; font-size: 0.85rem; color: rgba(255,255,255,0.4); padding-right: 0.25rem; }
+
+/* Shared */
+.btn-primary { width: 100%; padding: 0.85rem; border: none; border-radius: 0.75rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #0f0c29; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: rgba(10,8,30,0.97); border-top: 1px solid rgba(255,255,255,0.08); }
+.bottom-nav button { flex: 1; padding: 0.85rem; border: none; background: none; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 0.78rem; }
 .bottom-nav button.active { color: #ffd700; font-weight: 700; }
 </style>

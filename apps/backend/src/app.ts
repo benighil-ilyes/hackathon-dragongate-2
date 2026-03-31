@@ -6,6 +6,7 @@ import { storeExpenseApi } from './apis/expenses.js'
 import { storeBossApi } from './apis/bosses.js'
 import { storeLeaderboardApi } from './apis/leaderboard.js'
 import { storeDebugApi } from './apis/debug.js'
+import { storeProfileApi } from './apis/profile.js'
 
 const basePath = process.env.BASE_PATH || ''
 
@@ -33,6 +34,7 @@ storeExpenseApi(apiApp)
 storeBossApi(apiApp)
 storeLeaderboardApi(apiApp)
 storeDebugApi(apiApp)
+storeProfileApi(apiApp)
 
 
 // OpenAPI仕様書の生成

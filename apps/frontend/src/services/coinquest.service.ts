@@ -46,16 +46,16 @@ export const CATEGORIES = [
 ]
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  '食費': 'Alimentation',
-  '住居費': 'Logement',
-  '光熱・水道費': 'Énergie/Eau',
-  '家具・家事用品費': 'Maison',
-  '被服費': 'Vêtements',
-  '保健医療費': 'Santé',
-  '交通・通信費': 'Transport',
-  '教育費': 'Éducation',
-  '教養娯楽費': 'Loisirs',
-  'その他': 'Divers'
+  '食費': '食費',
+  '住居費': '住居費',
+  '光熱・水道費': '光熱・水道費',
+  '家具・家事用品費': '家具・家事用品費',
+  '被服費': '被服費',
+  '保健医療費': '保健医療費',
+  '交通・通信費': '交通・通信費',
+  '教育費': '教育費',
+  '教養娯楽費': '教養娯楽費',
+  'その他': 'その他'
 }
 
 export async function getBosses(): Promise<Boss[]> {
@@ -83,8 +83,7 @@ export async function getExpenses(month?: string): Promise<Expense[]> {
 }
 
 export async function createExpense(data: { amount: number; category: string; note?: string; spent_at?: string }): Promise<Expense> {
-  const res = await api('/expenses', { method: 'POST', body: data })
-  return res.data
+  return apiRequest<Expense>('/expenses', { method: 'POST', body: data })
 }
 
 export async function deleteExpense(id: number): Promise<void> {
@@ -110,6 +109,17 @@ export async function setDebugDate(date: string): Promise<string> {
 
 export async function resetDebugDate(): Promise<void> {
   await api('/debug/date', { method: 'DELETE' })
+}
+
+export interface UserProfile {
+  name: string
+  total_points: number
+  bosses_defeated: number
+  rank: string
+}
+
+export async function getProfile(): Promise<UserProfile> {
+  return apiRequest<UserProfile>('/profile')
 }
 
 export async function register(data: { name: string; email: string; password: string }): Promise<{ token: string; user: { id: number; name: string; email: string } }> {
