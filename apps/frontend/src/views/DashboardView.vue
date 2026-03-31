@@ -85,6 +85,30 @@
           <!-- Category breakdown -->
           <div v-if="categoryBreakdown.length > 0" class="category-card" role="region" aria-label="カテゴリ別支出内訳">
             <div class="card-title">📊 カテゴリ別内訳</div>
+
+            <!-- Pie chart -->
+            <div v-if="pieSlices.length > 0" class="pie-wrap">
+              <svg viewBox="0 0 120 120" class="pie-svg" aria-hidden="true">
+                <path v-for="(s, i) in pieSlices" :key="i"
+                  :d="slicePath(60, 60, 54, s.startAngle, s.endAngle)"
+                  :fill="s.color"
+                  stroke="#0f0c29" stroke-width="1.5"
+                />
+                <circle cx="60" cy="60" r="28" fill="#0f0c29" />
+                <text x="60" y="56" text-anchor="middle" fill="white" font-size="9" font-weight="bold">合計</text>
+                <text x="60" y="68" text-anchor="middle" fill="#ffd700" font-size="8">
+                  {{ Math.round(pieSlices.reduce((s, p) => s + p.spent, 0) / 1000) }}k円
+                </text>
+              </svg>
+              <div class="pie-legend">
+                <div v-for="s in pieSlices" :key="s.name" class="legend-item">
+                  <span class="legend-dot" :style="{ background: s.color }"></span>
+                  <span class="legend-name">{{ s.name }}</span>
+                  <span class="legend-pct">{{ Math.round(s.pct * 100) }}%</span>
+                </div>
+              </div>
+            </div>
+
             <div class="cat-list">
               <div v-for="cat in categoryBreakdown" :key="cat.name" class="cat-item"
                 :aria-label="`${cat.name}：${cat.spent.toLocaleString()}円（平均${cat.avg.toLocaleString()}円）`">
@@ -185,6 +209,33 @@
       </template>
     </main>
 
+    <!-- Battle result overlay -->
+    <Transition name="overlay">
+      <div v-if="showBattleOverlay" class="battle-overlay" :class="battleResult" @click="showBattleOverlay = false" role="dialog" aria-modal="true" :aria-label="battleResult === 'win' ? '勝利！' : '敗北...'">
+        <!-- Confetti (win only) -->
+        <template v-if="battleResult === 'win'">
+          <div v-for="p in confettiPieces" :key="p.id" class="confetti-piece"
+            :style="{
+              left: `${p.x}%`,
+              width: `${p.size}px`,
+              height: `${p.size * 0.5}px`,
+              background: p.color,
+              animationDuration: `${p.duration}s`,
+              animationDelay: `${p.delay}s`,
+              '--rot': `${p.rotation}deg`
+            }"
+          ></div>
+        </template>
+
+        <div class="overlay-content" :class="battleResult">
+          <div class="overlay-icon">{{ battleResult === 'win' ? '🏆' : '💀' }}</div>
+          <div class="overlay-title">{{ battleResult === 'win' ? '勝利！' : '敗北...' }}</div>
+          <div class="overlay-msg">{{ battleMsg }}</div>
+          <div class="overlay-tap">タップして閉じる</div>
+        </div>
+      </div>
+    </Transition>
+
     <nav class="bottom-nav" role="navigation" aria-label="メインナビゲーション">
       <button class="active" aria-label="ホーム（現在のページ）" aria-current="page">🏠 ホーム</button>
       <button @click="router.push('/boss-select')" aria-label="ボス選択">👾 ボス</button>
@@ -219,6 +270,9 @@ const newDate = ref(new Date().toISOString().split('T')[0])
 const adding = ref(false)
 const addError = ref('')
 const battleMsg = ref('')
+const battleResult = ref<'win' | 'lose' | null>(null)
+const showBattleOverlay = ref(false)
+const confettiPieces = ref<any[]>([])
 const showDatePicker = ref(false)
 
 const BOSS_EMOJI: Record<number, string> = { 1: '🟢', 2: '🔵', 3: '🟠', 4: '🔴', 5: '💀' }
@@ -285,6 +339,66 @@ const formatDebugDate = (iso: string) => new Date(iso).toLocaleString('ja-JP')
 
 const catColor = (cat: string) => CAT_COLORS[cat] ?? '#b2bec3'
 
+// --- Pie chart ---
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg - 90) * Math.PI / 180
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+}
+
+function slicePath(cx: number, cy: number, r: number, start: number, end: number): string {
+  if (end - start >= 359.9) {
+    // Deux demi-arcs pour éviter le bug SVG du cercle complet
+    const top = polarToCartesian(cx, cy, r, 0)
+    const bottom = polarToCartesian(cx, cy, r, 180)
+    return `M ${top.x} ${top.y} A ${r} ${r} 0 1 1 ${bottom.x} ${bottom.y} A ${r} ${r} 0 1 1 ${top.x} ${top.y} Z`
+  }
+  const s = polarToCartesian(cx, cy, r, start)
+  const e = polarToCartesian(cx, cy, r, end)
+  const large = end - start > 180 ? 1 : 0
+  return `M ${cx} ${cy} L ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y} Z`
+}
+
+const pieSlices = computed(() => {
+  const items = categoryBreakdown.value.filter(c => c.spent > 0)
+  const total = items.reduce((s, c) => s + c.spent, 0)
+  if (total === 0) return []
+  let angle = 0
+  return items.map(c => {
+    const pct = c.spent / total
+    const start = angle
+    angle += pct * 360
+    return { name: c.name, spent: c.spent, pct, startAngle: start, endAngle: angle, color: CAT_COLORS[c.name] ?? '#b2bec3' }
+  })
+})
+
+// --- Battle sound & vibration ---
+function playBattleSound(result: 'win' | 'lose') {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const notes = result === 'win'
+      ? [523, 659, 784, 1047]   // C5 E5 G5 C6 — fanfare
+      : [392, 330, 294, 220]    // descending
+    const type = result === 'win' ? 'square' : 'sawtooth'
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.type = type
+      osc.frequency.value = freq
+      const t = ctx.currentTime + i * 0.18
+      gain.gain.setValueAtTime(0.12, t)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
+      osc.start(t); osc.stop(t + 0.35)
+    })
+  } catch { /* audio non supporté */ }
+}
+
+function triggerVibration(result: 'win' | 'lose') {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(result === 'win' ? [100, 50, 100, 50, 200] : [400, 100, 400])
+  }
+}
+
 const categoryBreakdown = computed(() => {
   if (!status.value?.boss || !status.value?.household_size) return []
   const avgEntry = store.avgExpensesData.find(e => e.household_size === status.value!.household_size)
@@ -345,6 +459,23 @@ const handleAdd = async () => {
 const handleBattle = async () => {
   const result = await store.battle()
   battleMsg.value = result.message
+  battleResult.value = result.result as 'win' | 'lose'
+
+  if (result.result === 'win') {
+    confettiPieces.value = Array.from({ length: 70 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 1.8,
+      duration: 2.5 + Math.random() * 2,
+      color: ['#ffd700','#ff6b6b','#4ecdc4','#45b7d1','#96ceb4','#ffeaa7','#fd79a8','#6c5ce7'][Math.floor(Math.random() * 8)],
+      size: 7 + Math.random() * 9,
+      rotation: Math.random() * 720 - 360,
+    }))
+  }
+
+  showBattleOverlay.value = true
+  playBattleSound(result.result as 'win' | 'lose')
+  triggerVibration(result.result as 'win' | 'lose')
   await store.loadProfile()
 }
 
@@ -425,6 +556,57 @@ const resetDate = async () => {
 
 .btn-battle { width: 100%; padding: 0.8rem; border: none; border-radius: 0.75rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #0f0c29; font-size: 0.95rem; font-weight: 800; cursor: pointer; }
 .battle-result { margin-top: 0.75rem; background: rgba(255,255,255,0.06); border-radius: 0.75rem; padding: 0.75rem; font-size: 0.85rem; text-align: center; line-height: 1.5; }
+
+/* Battle overlay */
+.battle-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+.battle-overlay.win { background: radial-gradient(ellipse at center, rgba(255,215,0,0.25) 0%, rgba(15,12,41,0.97) 70%); }
+.battle-overlay.lose { background: radial-gradient(ellipse at center, rgba(244,67,54,0.2) 0%, rgba(15,12,41,0.97) 70%); }
+
+.overlay-content { text-align: center; z-index: 2; padding: 2rem; animation: overlayIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.overlay-content.lose { animation: overlayShake 0.5s ease-in-out, overlayIn 0.4s ease; }
+.overlay-icon { font-size: 5rem; margin-bottom: 0.75rem; filter: drop-shadow(0 0 20px rgba(255,215,0,0.6)); }
+.overlay-content.lose .overlay-icon { filter: drop-shadow(0 0 20px rgba(244,67,54,0.6)); }
+.overlay-title { font-size: 2.5rem; font-weight: 900; color: #ffd700; margin-bottom: 0.75rem; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+.overlay-content.lose .overlay-title { color: #f44336; text-shadow: 0 0 20px rgba(244,67,54,0.5); }
+.overlay-msg { font-size: 0.9rem; color: rgba(255,255,255,0.75); line-height: 1.7; max-width: 300px; margin: 0 auto 1.25rem; }
+.overlay-tap { font-size: 0.75rem; color: rgba(255,255,255,0.3); animation: pulse 1.5s ease-in-out infinite; }
+
+@keyframes overlayIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes overlayShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-12px); }
+  40% { transform: translateX(12px); }
+  60% { transform: translateX(-8px); }
+  80% { transform: translateX(8px); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* Confetti */
+.confetti-piece { position: absolute; top: -20px; border-radius: 2px; animation: confettiFall linear forwards; }
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(var(--rot)); opacity: 0; }
+}
+
+/* Overlay transition */
+.overlay-enter-active, .overlay-leave-active { transition: opacity 0.3s ease; }
+.overlay-enter-from, .overlay-leave-to { opacity: 0; }
+
+/* Pie chart */
+.pie-wrap { display: flex; align-items: center; gap: 1rem; margin: 0.75rem 0 1rem; }
+.pie-svg { width: 120px; height: 120px; flex-shrink: 0; }
+.pie-legend { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; overflow: hidden; }
+.legend-item { display: flex; align-items: center; gap: 0.4rem; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.legend-name { font-size: 0.72rem; color: rgba(255,255,255,0.6); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend-pct { font-size: 0.72rem; font-weight: 700; color: white; }
 
 /* Category breakdown */
 .category-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem; }
